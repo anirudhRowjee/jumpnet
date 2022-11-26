@@ -11,55 +11,33 @@ Jumpnet is a kafka clone written in Golang and Python.
 └── mux                 | Mux is what makes Jumpnet work. It's the broker set and the broker manager.
 ```
 
-## Interface
+## Broker Interface
 This is the web interface of the project.
 
 We assume that every broker has an independent IP and port, so this interface is designed to work on each and every broker, regardless of who the leader is.
 
-### Registration
-Returns - A unique Token to register this device
+- These interfaces work for _every_ node in the broker cluster. 
+- Every node supports publish and subscribe operations
 
-- POST `/register/producer`
-
-  Register a producer to this cluster
-    
-- POST `/register/consumer`
-
-  Register a Consumer to this cluster
-  
 ### Publishing
 
-- POST `/publish/<topic: str>`
+- PUT `/`
 
   Body - JSON Object with the messages, compulsory publisher ID token
     ```json
     {
-        "producer_id": "XYZ",
-        "hello": "world"
+      "Key": <topic name: str>
+      "Value": <Message: str>
     }
     ```
 
 ### Consuming
 
-- POST `/consume/<topic: str>`
-
+- GET `/<topic: str>`
   Returns the newest messages on that topic
-  Body - compulsory  ID token
-    ```json
-    {
-        "consumer_id": "XYZ",
-    }
-    ```
 
-- POST `/consume_from_beginning/<topic: str>`
-
+- GET `/history/<topic: str>`
   Returns all the known messages on that topic
-  Body - compulsory  ID token
-    ```json
-    {
-        "consumer_id": "XYZ",
-    }
-    ```
 
 ## Architecture
 ![](./.github/arch_diagram.png)

@@ -34,15 +34,23 @@ type Entry struct {
 
 type StateMachine struct {
 	mu sync.Mutex
-	// TODO redesign this to support [string]Vec<String>, Change server semantics as well
-	// kv map[string][]string
-	kv map[string]string
+	kv map[string][]string
 }
+
+var (
+	node *raft.Node
+	fsm  *StateMachine
+)
+
+/*
+   STATE MACHINE METHODS
+   * TODO see if it's possible to add support for random BLOBs or JSON Objects instead of just text
+   * TODO Add Timestamp on each message
+*/
 
 func NewStateMachine() *StateMachine {
 	return &StateMachine{
-		// kv: make(map[string][]string),
-		kv: make(map[string]string),
+		kv: make(map[string][]string),
 	}
 }
 
@@ -59,12 +67,13 @@ func (s *StateMachine) Apply(data []byte) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// TODO Refactor this to support writing the latest message to the first part of the list
-	// s.kv[e.Key] = append([]string{e.Value}, s.kv[e.Key]...)
-	s.kv[e.Key] = e.Value
+	s.kv[e.Key] = append([]string{e.Value}, s.kv[e.Key]...)
+	// s.kv[e.Key] = e.Value
 }
 
 // Function to write the state to Disk
 func (s *StateMachine) Snapshot() (io.ReadCloser, error) {
+	// TODO Refactor this to write to directories based on topic
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	buf, err := json.Marshal(&s.kv)
@@ -93,17 +102,43 @@ func (s *StateMachine) Restore(r io.ReadCloser) error {
 }
 
 // Function to read from the FSM
-func (s *StateMachine) Read(key string) string {
+func (s *StateMachine) Read(key string) []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// TODO Adjust logic to read latest/all messages from this block
 	return s.kv[key]
 }
 
-var (
-	node *raft.Node
-	fsm  *StateMachine
-)
+func (s *StateMachine) ReadLatest(key string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.kv[key][0]
+}
+
+/*
+   Request Handler Methods
+*/
+
+func history(w http.ResponseWriter, r *http.Request) {
+	key := mux.Vars(r)["key"]
+
+	ctx, cancel := context.WithTimeout(r.Context(), time.Second)
+	defer cancel()
+
+	if err := node.LinearizableRead(ctx); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	value := fsm.Read(key)
+	val, err := json.Marshal(value)
+	if err != nil {
+		w.Write([]byte("Cannot Marshal!"))
+	} else {
+		w.Write(val)
+	}
+	w.Write([]byte{'\n'})
+}
 
 func get(w http.ResponseWriter, r *http.Request) {
 	key := mux.Vars(r)["key"]
@@ -116,7 +151,8 @@ func get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	value := fsm.Read(key)
+	value := fsm.ReadLatest(key)
+	// Return the Latest Message in the message queue for the specific topic
 	w.Write([]byte(value))
 	w.Write([]byte{'\n'})
 }
@@ -193,6 +229,7 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/", http.HandlerFunc(save)).Methods("PUT", "POST")
 	router.HandleFunc("/{key}", http.HandlerFunc(get)).Methods("GET")
+	router.HandleFunc("/history/{key}", http.HandlerFunc(history)).Methods("GET")
 	router.HandleFunc("/mgmt/nodes", http.HandlerFunc(nodes)).Methods("GET")
 	router.HandleFunc("/mgmt/nodes/{id}", http.HandlerFunc(removeNode)).Methods("DELETE")
 
