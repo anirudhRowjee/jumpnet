@@ -21,7 +21,7 @@ We assume that every broker has an independent IP and port, so this interface is
 
 ### Publishing
 
-- PUT `/`
+- PUT `localhost:9090X/`
 
   Body - JSON Object with the messages, compulsory publisher ID token
     ```json
@@ -33,13 +33,55 @@ We assume that every broker has an independent IP and port, so this interface is
 
 ### Consuming
 
-- GET `/<topic: str>`
+- GET `localhost:909X/<topic: str>`
   Returns the newest messages on that topic
 
-- GET `/history/<topic: str>`
+- GET `localhost:909X/history/<topic: str>`
   Returns all the known messages on that topic
 
+### Example
+
+Here `9091` is the current broker. These commands will work with _any_ broker instance, so examples will need to change the port number accordingly.
+
+#### Publishing
+
+```sh
+$ curl -L http://127.0.0.1:9091/ -X PUT -d '{"Key":"<KEY>", "Value":"<VALUE>"}'
+```
+
+#### Subscribing
+
+```sh
+$ curl -L http://127.0.0.1:9091/<KEY>
+```
+
+
+### Running the Brokers
+
+```sh
+cd mux
+go build main.go
+```
+
+You'll have a `main` binary in the `mux` folder.
+
+1. Start the first node in the Raft Cluster
+
+  ```
+  ./main -state_dir=./tempdata/1 -raft :8080 -api :9090
+  ```
+  
+2. Start Additional Nodes to join the cluster, **_in separate shells_**
+
+  ```
+  ./main -state_dir ./tempdata/2 -raft :8081 -api :9091 -join :8080
+  ./main -state_dir ./tempdata/3 -raft :8082 -api :9092 -join :8080
+  ```
+
+
 ## Architecture
+Jumpnet's `mux` uses Raft as the replication layer, implementing a simple key-List[Value] store on top of Raft. The replicated log manages inserts, deletes, topic creation, and multiple other requirements.
+
 ![](./.github/arch_diagram.png)
 
 ## Components
