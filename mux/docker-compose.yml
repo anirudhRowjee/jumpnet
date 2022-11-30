@@ -1,50 +1,61 @@
 # Docker-compose file to setup at least three nodes as leaders
-version: '3'
+version: '3.9'
+
 services:
+
   leader_node:
     # configuration for leader node
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      # port for the raft cluster
-      - "8080"
-      # port for the HTTP API
-      - "9090"
-    restart: always
-    networks:
-      - mainnet
+    environment:
+      - SERVER_PORT=9090
+      - RAFT_PORT=8080
     command:
       - "/kafka-broker"
       - "-state_dir=./temp"
       - "-raft=:8080"
       - "-api=:9090"
+    ports:
+      - 8080:8080
+      - 9090:9090
 
-  everyone_else:
-    # Configuration for everyone else
+  followers_1:
+    # configuration for leader node
     build:
       context: .
       dockerfile: Dockerfile
-    restart: always
     depends_on:
       - leader_node
-    ports:
-      # port for the raft cluster
-      - "8080"
-      # port for the HTTP API
-      - "9090"
-    networks:
-      - mainnet
     environment:
-      LEADER: leader_node
+      - SERVER_PORT=9090
+      - RAFT_PORT=8080
     command:
       - "/kafka-broker"
       - "-state_dir=./temp"
-      - -raft=everyone_else:8080
-      - -api=everyone_else:9090
-      - -join=leader_node:8080
-    deploy:
-      replicas: 4
+      - "-raft=:8080"
+      - "-api=:9090"
+      - "-join=:8080"
+    ports:
+      - 8081:8080
+      - 9091:9090
 
-networks:
-  mainnet:
+  followers_2:
+    # configuration for leader node
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - SERVER_PORT=9090
+      - RAFT_PORT=8080
+    command:
+      - "/kafka-broker"
+      - "-state_dir=./temp"
+      - "-raft=:8080"
+      - "-api=:9090"
+      - "-join=:8080"
+    depends_on:
+      - leader_node
+    ports:
+      - 8082:8080
+      - 9092:9090
