@@ -23,7 +23,7 @@ class JumpnetProducer:
     def send_message(self, message):
         # Make an HTTP PUT request to the Broker
         # Check the response status, and reply appropriately
-        req = requests.put(self.server_URL + "/publish", json={
+        req = requests.put(self.server_URL, json={
             "Key": self.topic_name,
             "Value": str(message)
         })
