@@ -26,3 +26,26 @@ class JumpnetProducer:
             "Value": str(message)
         })
         return req.status_code
+
+class JumpnetConsumer:
+    def __init__(self, topic_name: str, server_URL: str):
+        # Initialize the producer
+        logging.debug("Starting jumpnet consumer...")
+        self.topic_name = topic_name
+        self.server_URL = server_URL 
+
+    def receiver_message_latest(self):
+        # Make an HTTP PUT request to the Broker
+        # Check the response status, and reply appropriately
+        req = requests.get(self.server_URL + "/" + self.topic_name)
+        return req.content
+        
+        
+    def receiver_message_all(self):
+        # parse the json ie get the array to normal text that can be used in python
+        # Make an HTTP PUT request to the Broker
+        # Check the response status, and reply appropriately
+        req = requests.get(self.server_URL + "/history/" + self.topic_name)
+        # return req.content
+        all_msgs = json.loads(req.content)
+        return all_msgs
